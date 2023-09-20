@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 func (server *WebSocketServer) GetRoomClients(roomID string) ([]string, error) {
@@ -23,27 +24,34 @@ func (server *WebSocketServer) GetRoomClients(roomID string) ([]string, error) {
 
 	clientList := make([]string, 0, len(room.Players))
 	for roomClient := range room.Players {
-		clientList = append(clientList, roomClient.Name)
+		clientList = append(clientList, roomClient.ID)
 	}
 
 	return clientList, nil
 }
 
-func (server *WebSocketServer) CreateRoom(roomID string) (*Room, error) {
+func (server *WebSocketServer) CreateRoom(roomID string, client *Client) (*Room, error) {
 	server.roomsMutex.Lock()
 	defer server.roomsMutex.Unlock()
 
 	room := &Room{
-		ID:      roomID,
-		Name:    "",
-		Players: make(map[*Client]bool),
+		ID:          roomID,
+		Name:        "",
+		Players:     make(map[*Client]bool),
+		CreatedTime: time.Now(),
+		CreatedUser: client.ID,
 	}
+	// 初始設置一個用戶
+	room.Players[client] = true
+
 	server.Rooms[roomID] = room
 
 	key := common.GetRoomCreatedKey(roomID)
 	roomInfo := &types.RoomInfo{
-		ID:   room.ID,
-		Name: room.Name,
+		ID:          room.ID,
+		Name:        room.Name,
+		CreatedUser: room.CreatedUser,
+		CreatedTime: room.CreatedTime,
 		Players: func() map[string]bool {
 			players := make(map[string]bool)
 			for player := range room.Players {
@@ -107,6 +115,7 @@ func (server *WebSocketServer) GetRoomList() ([]*types.RoomInfo, error) {
 	return rooms, nil
 }
 func (server *WebSocketServer) GetRoomMap() (map[string]*types.RoomInfo, error) {
+
 	server.roomsMutex.Lock()
 	defer server.roomsMutex.Unlock()
 
@@ -129,4 +138,23 @@ func (server *WebSocketServer) GetRoomMap() (map[string]*types.RoomInfo, error) 
 	}
 
 	return rooms, nil
+}
+
+func (server *WebSocketServer) GetRoomByIDIFExist(roomID string) (*Room, error) {
+	var rooms map[string]*types.RoomInfo
+	var err error
+
+	room, exists := server.Rooms[roomID]
+	if !exists {
+		rooms, err = server.GetRoomMap()
+		if roomInfo, ok := rooms[roomID]; ok {
+			room = &Room{
+				ID:      roomInfo.ID,
+				Name:    roomInfo.Name,
+				Players: server.GetPlayerClientByID(roomInfo.Players),
+			}
+		}
+		server.Rooms[roomID] = room
+	}
+	return room, err
 }

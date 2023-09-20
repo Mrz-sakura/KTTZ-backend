@@ -12,7 +12,7 @@ import (
 	"math/rand"
 )
 
-func (s *WebSocketServer) StartThrowsHandler(c *Client, msg *types.Message) {
+func (server *WebSocketServer) StartThrowsHandler(c *Client, msg *types.Message) {
 	args := msg.Data
 	message := msg
 
@@ -48,12 +48,12 @@ func (s *WebSocketServer) StartThrowsHandler(c *Client, msg *types.Message) {
 
 	message.Data = common.GenerateData("dice_values", diceValue.Value, nil)
 
-	s.BroadcastMessage(c, message)
+	server.BroadcastMessage(c, message)
 
-	s.PlayerAction(c.GameID, c)
+	server.PlayerAction(c.GameID, c)
 }
 
-func (s *WebSocketServer) SetScoreHandler(c *Client, msg *types.Message) {
+func (server *WebSocketServer) SetScoreHandler(c *Client, msg *types.Message) {
 	args := msg.Data
 	message := msg
 
@@ -214,7 +214,7 @@ func (s *WebSocketServer) SetScoreHandler(c *Client, msg *types.Message) {
 
 	message.Data = common.GenerateData("dice_score", DiceScore, nil)
 
-	s.BroadcastMessage(c, message)
+	server.BroadcastMessage(c, message)
 }
 
 //func GetDiceInfoHandler(s *WebSocketServer, c *Client, msg *types.Message) {

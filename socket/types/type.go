@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type Message struct {
 	Type  string                 `json:"type"`
 	From  *ClientInfo            `json:"from"`
@@ -10,23 +12,31 @@ type Message struct {
 
 type ClientInfo struct {
 	ID       string `json:"id"`
-	RoomName string `json:"room_name"`
-	Name     string `json:"name"`
-	GameID   string `json:"game_id"`
+	RoomID   string `json:"room_id,omitempty"`
+	RoomName string `json:"room_name,omitempty"`
+	Name     string `json:"name,omitempty"`
+	GameID   string `json:"game_id,omitempty"`
 }
 
 type GameInfo struct {
 	ID            string          `json:"id"`
+	RoomID        string          `json:"room_id"`
 	RoomName      string          `json:"room_name"`
 	Round         int             `json:"round"`      // 新增字段，表示当前回合
 	MaxRounds     int             `json:"max_rounds"` // 新增字段，表示最大回合数 12
 	Players       map[string]bool `json:"players"`
 	PlayerActions map[string]bool `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
+	CreatedTime   time.Time       `json:"created_time"`
+	EndTime       time.Time       `json:"end_time"`
+	CreatedUser   string          `json:"created_user"`
 }
+
 type RoomInfo struct {
-	ID      string          `json:"id"`
-	Name    string          `json:"room_name"`
-	Players map[string]bool `json:"players"`
+	ID          string          `json:"id"`
+	Name        string          `json:"room_name"`
+	Players     map[string]bool `json:"players"`
+	CreatedTime time.Time       `json:"created_time"`
+	CreatedUser string          `json:"created_user"`
 }
 
 var (

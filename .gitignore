@@ -1,1 +1,11 @@
 config/config.local.yaml
+
+
+main.exe
+
+.vscode
+.idea
+
+cmd/main.exe
+
+tmp/

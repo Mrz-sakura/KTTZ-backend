@@ -48,7 +48,10 @@ func GetRoomCreatedKey(roomID string) string {
 	return fmt.Sprintf("%s_%s", config.GetString("redis_key.room_created_key"), roomID)
 }
 func GetRoomListKey() string {
-	return fmt.Sprintf("%s_%s", config.GetString("redis_key.room_list_key"))
+	return fmt.Sprintf("%s", config.GetString("redis_key.room_list_key"))
+}
+func GetGameListKey() string {
+	return fmt.Sprintf("%s", config.GetString("redis_key.game_list_key"))
 }
 
 // 获取骰子的最新的值

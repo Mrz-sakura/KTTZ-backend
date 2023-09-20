@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // WebSocketServer 结构体将包含有关WebSocket服务器的信息和方法
@@ -21,7 +22,7 @@ type WebSocketServer struct {
 	routes     map[string]func(*Client, *types.Message)
 	Rooms      map[string]*Room `json:"rooms"`
 	roomsMutex sync.Mutex
-	games      map[string]*Game
+	Games      map[string]*Game
 	gamesMutex sync.Mutex
 
 	Redis *redis.Client
@@ -29,22 +30,29 @@ type WebSocketServer struct {
 
 type Game struct {
 	ID            string           `json:"id"`
+	RoomID        string           `json:"room_id"`
 	RoomName      string           `json:"room_name"`
 	Round         int              `json:"round"`      // 新增字段，表示当前回合
 	MaxRounds     int              `json:"max_rounds"` // 新增字段，表示最大回合数 12
 	Players       map[*Client]bool `json:"players"`
 	PlayerActions map[*Client]bool `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
+	CreatedTime   time.Time        `json:"created_time"`
+	EndTime       time.Time        `json:"end_time"`
+	CreatedUser   string           `json:"created_user"`
 }
 type Room struct {
-	ID      string           `json:"id"`
-	Name    string           `json:"name"`
-	Players map[*Client]bool `json:"players"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Players     map[*Client]bool `json:"players"`
+	CreatedTime time.Time        `json:"created_time"`
+	CreatedUser string           `json:"created_user"`
 }
 
 type Client struct {
 	conn     *websocket.Conn
 	ID       string `json:"id"`
 	Room     *Room  `json:"room"`
+	Game     *Game  `json:"game"`
 	RoomName string `json:"room_name"`
 	Name     string `json:"name"`
 	GameID   string `json:"game_id"`
@@ -61,7 +69,7 @@ func NewWebSocketServer() *WebSocketServer {
 		},
 		routes: make(map[string]func(*Client, *types.Message)),
 		Rooms:  make(map[string]*Room),
-		games:  make(map[string]*Game),
+		Games:  make(map[string]*Game),
 		Redis:  redis,
 	}
 
@@ -86,6 +94,10 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 		conn: conn,
 		ID:   clientID,
 	}
+
+	fmt.Printf("client connected to server client_id=>%s", clientID)
+
+	// 存储客户端
 	server.clients.Store(clientID, client)
 
 	defer func() {
@@ -105,6 +117,9 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 			fmt.Println("Message Unmarshal Error:", err)
 			continue
 		}
+
+		fmt.Println("get message message type=>", message.Type)
+		fmt.Println("get message message data=>", message.Data)
 
 		message.From = &types.ClientInfo{
 			ID:       client.ID,
@@ -137,8 +152,8 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 
 func (server *WebSocketServer) BroadcastMessage(client *Client, message *types.Message) {
 
-	roomName := client.RoomName
-	if roomName == "" {
+	roomID := client.Room.ID
+	if roomID == "" {
 		fmt.Println("Client is not in any room")
 		return
 	}
@@ -146,14 +161,14 @@ func (server *WebSocketServer) BroadcastMessage(client *Client, message *types.M
 	server.roomsMutex.Lock()
 	defer server.roomsMutex.Unlock()
 
-	if room, ok := server.Rooms[roomName]; ok {
+	if room, ok := server.Rooms[roomID]; ok {
 		for client := range room.Players {
 			if err := client.conn.WriteJSON(message); err != nil {
 				fmt.Println("Broadcast Error:", err)
 			}
 		}
 	} else {
-		fmt.Printf("No room found with name: %s\n", roomName)
+		fmt.Printf("No room found with name: %s\n", roomID)
 	}
 }
 
@@ -164,19 +179,12 @@ func (server *WebSocketServer) sendJSON(conn *websocket.Conn, message interface{
 func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 	var err error
 
-	//rooms,err := server.GetRoomList()
-	//if err!= nil {
-	//    fmt.Println("GetRoomList Error:", err)
-	//    return
-	//}
-	//server.Rooms =
+	room, err := server.GetRoomByIDIFExist(roomID)
 
-	server.roomsMutex.Lock()
-	room, exists := server.Rooms[roomID]
-	if !exists {
-		room, err = server.CreateRoom(roomID)
+	if room == nil {
+		room, err = server.CreateRoom(roomID, client)
+		server.Rooms[roomID] = room
 	}
-	server.roomsMutex.Unlock()
 
 	room.Players[client] = true
 	client.Room = room
@@ -184,6 +192,7 @@ func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 	clientList, err := server.GetRoomClients(roomID)
 
 	response := &types.Message{
+		Type: types.JOIN_ROOM,
 		Data: map[string]interface{}{
 			"room_id":     roomID,
 			"client_list": clientList,
@@ -213,71 +222,33 @@ func (server *WebSocketServer) LeaveRoom(client *Client, roomName string) {
 }
 
 // 新方法来创建一个游戏
-func (server *WebSocketServer) CreateGame(client *Client, message *types.Message) {
-	server.gamesMutex.Lock()
-	defer server.gamesMutex.Unlock()
+func (server *WebSocketServer) HandleCreateGame(client *Client, message *types.Message) {
+	var err error
 
 	// 生成一个游戏ID（这里使用简单的UUID生成方式，你可以更改为任何其他方式）
 	gameID := utils.GenUniqueID(client.ID)
-
-	game := &Game{
-		ID:            gameID,
-		RoomName:      client.Room.Name,
-		Round:         1,  // 初始化回合数为 1
-		MaxRounds:     12, // 设置最大回合数为 12
-		Players:       make(map[*Client]bool),
-		PlayerActions: make(map[*Client]bool),
-	}
+	// 将新创建的游戏保存到服务器的游戏映射中
+	game, err := server.CreateGame(gameID, client)
 
 	// 从房间中获取所有客户端并将他们添加到游戏中
-	server.roomsMutex.Lock()
-	roomClients, exists := server.Rooms[client.Room.ID]
-	if exists {
-		for player := range roomClients.Players {
-			game.Players[player] = true
-			game.PlayerActions[player] = false // 初始化玩家行动状态为false
-		}
-	}
-	server.roomsMutex.Unlock()
-
-	// 将新创建的游戏保存到服务器的游戏映射中
-	server.games[gameID] = game
+	server.Games[gameID] = game
+	client.Game = game
 
 	// 创建一个消息来通知客户端游戏已创建
 	response := types.Message{
 		Type: types.GAME_CREATED,
 		Data: map[string]interface{}{
-			"game_id": gameID,
-			"round":   game.Round, // 添加回合信息到消息中
+			"game_id":      gameID,
+			"round":        game.Round, // 添加回合信息到消息中
+			"created_time": game.CreatedTime,
 		},
 		From: &types.ClientInfo{
-			ID:       client.ID,
-			RoomName: client.RoomName,
-			Name:     client.Name,
-			GameID:   client.GameID, // 同时也可以在消息中包含游戏ID
+			ID:     client.ID,
+			RoomID: client.Room.ID,
+			Name:   client.Name,
+			GameID: gameID, // 同时也可以在消息中包含游戏ID
 		},
 	}
-
-	err := common.SetGameCreatedData(game.ID, &types.GameInfo{
-		ID:        game.ID,
-		RoomName:  game.RoomName,
-		Round:     game.Round,
-		MaxRounds: game.MaxRounds,
-		Players: func() map[string]bool {
-			players := make(map[string]bool)
-			for player := range game.Players {
-				players[player.ID] = true
-			}
-			return players
-		}(),
-		PlayerActions: func() map[string]bool {
-			players := make(map[string]bool)
-			for player := range game.Players {
-				players[player.ID] = false
-			}
-			return players
-		}(),
-	})
 
 	if err != nil {
 		response.Error = err.Error()
@@ -318,7 +289,7 @@ func (server *WebSocketServer) PlayerAction(gameID string, client *Client) {
 	server.gamesMutex.Lock()
 	defer server.gamesMutex.Unlock()
 
-	game, exists := server.games[gameID]
+	game, exists := server.Games[gameID]
 	if !exists {
 		fmt.Printf("No game found with ID: %s\n", gameID)
 		return
