@@ -102,6 +102,7 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 
 	defer func() {
 		server.clients.Delete(clientID)
+		fmt.Println("================================================================1111")
 		conn.Close()
 	}()
 
@@ -118,25 +119,27 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 			continue
 		}
 
-		fmt.Println("get message message type=>", message.Type)
-		fmt.Println("get message message data=>", message.Data)
+		fmt.Println("get message message type=>", message.Type, client.ID)
+		fmt.Println("get message message data=>", message.Data, client.ID)
 
 		message.From = &types.ClientInfo{
 			ID:       client.ID,
 			RoomName: client.RoomName,
 			Name:     client.Name,
 		}
-
 		if message.Type == "join_room" {
 			roomID, ok := message.Data["room_id"].(string)
-			if ok {
-				server.JoinRoom(client, roomID)
+			if !ok {
+				roomID = ""
 			}
+			server.JoinRoom(client, roomID)
+
 		} else if message.Type == "leave_room" {
 			roomID, ok := message.Data["room_id"].(string)
-			if ok {
-				server.LeaveRoom(client, roomID)
+			if !ok {
+				roomID = ""
 			}
+			server.LeaveRoom(client, roomID)
 		} else if message.Type == "player_action" {
 			gameID, ok := message.Data["game_id"].(string)
 			if ok {
@@ -171,6 +174,11 @@ func (server *WebSocketServer) BroadcastMessage(client *Client, message *types.M
 		fmt.Printf("No room found with name: %s\n", roomID)
 	}
 }
+func (server *WebSocketServer) SendMessageToClient(client *Client, message *types.Message) {
+	if err := client.conn.WriteJSON(message); err != nil {
+		fmt.Println("Send Message Error:", err)
+	}
+}
 
 func (server *WebSocketServer) sendJSON(conn *websocket.Conn, message interface{}) error {
 	return conn.WriteJSON(message)
@@ -178,6 +186,12 @@ func (server *WebSocketServer) sendJSON(conn *websocket.Conn, message interface{
 
 func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 	var err error
+	response := &types.Message{}
+	if roomID == "" {
+		response.Error = "请输入房间的ID..."
+		server.SendMessageToClient(client, response)
+		return
+	}
 
 	room, err := server.GetRoomByIDIFExist(roomID)
 
@@ -191,15 +205,17 @@ func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 
 	clientList, err := server.GetRoomClients(roomID)
 
-	response := &types.Message{
-		Type: types.JOIN_ROOM,
-		Data: map[string]interface{}{
-			"room_id":     roomID,
-			"client_list": clientList,
-		},
+	response.Type = types.JOIN_ROOM
+	response.Data = map[string]interface{}{
+		"room_id":     roomID,
+		"client_list": clientList,
 	}
+	response.From = &types.ClientInfo{ID: client.ID}
+
 	if err != nil {
 		response.Error = err.Error()
+		server.SendMessageToClient(client, response)
+		return
 	}
 
 	server.BroadcastMessage(client, response)

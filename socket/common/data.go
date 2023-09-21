@@ -22,6 +22,9 @@ func GenerateData(key string, value interface{}, data map[string]interface{}) ma
 func GetDiceKey(gameID string, partID string, userID string) string {
 	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_key"), gameID, partID, userID)
 }
+func GetScoreKey(gameID string, partID string, userID string) string {
+	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_score_key"), gameID, partID, userID)
+}
 
 func GetGameCreatedKey(gameID string) string {
 	return fmt.Sprintf("%s_%s", config.GetString("redis_key.game_created_key"), gameID)
@@ -55,10 +58,10 @@ func GetGameListKey() string {
 }
 
 // 获取骰子的最新的值
-func GetDiceValue(key string, value interface{}) *types.DiceValue {
+func GetDiceValue(key string) *types.DiceValue {
 	rc, _ := mod.GetRedisClient()
 
-	key = fmt.Sprintf("%s%d", config.GetString("redis_key.dice_key"), 1)
+	key = fmt.Sprintf("%s%d", config.GetString("redis_key.dice_key"), key)
 
 	diceValue := &types.DiceValue{Value: make([]int, 5)}
 

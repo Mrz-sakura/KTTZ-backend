@@ -10,6 +10,31 @@ import (
 	"time"
 )
 
+//func (server *WebSocketServer) HandleGetGameOne(client *Client, message *types.Message) {
+//	var err error
+//
+//	id := utils.MapToString(message.Data, "game_id")
+//	roomList, err := server.GetGameByID(id)
+//
+//	// 创建一个消息来通知客户端游戏已创建
+//	response := types.Message{
+//		Type: types.ROOMLIST,
+//		Data: map[string]interface{}{
+//			"room_list": roomList,
+//		},
+//		From: &types.ClientInfo{
+//			ID: client.ID,
+//		},
+//	}
+//
+//	if err != nil {
+//		response.Error = err.Error()
+//	}
+//
+//	// 广播消息到所有在房间中的客户端
+//	server.SendMessageToClient(client, &response)
+//}
+
 func (server *WebSocketServer) GetGameClients(roomID string) ([]string, error) {
 	if roomID == "" {
 		return nil, fmt.Errorf("room name cannot be empty")
@@ -151,4 +176,23 @@ func (server *WebSocketServer) GetGameMap() (map[string]*types.GameInfo, error) 
 	}
 
 	return games, nil
+}
+func (server *WebSocketServer) GetGameByID() (*types.GameInfo, error) {
+	server.gamesMutex.Lock()
+	defer server.gamesMutex.Unlock()
+
+	key := common.GetGameListKey()
+
+	gameData, err := server.Redis.Get(context.Background(), key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var game *types.GameInfo
+	err = json.Unmarshal([]byte(gameData), &game)
+	if err != nil {
+		return nil, err
+	}
+
+	return game, nil
 }

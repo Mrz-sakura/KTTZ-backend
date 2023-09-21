@@ -1,0 +1,20 @@
+server:
+  host: "0.0.0.0"
+  port: 1001
+
+redis:
+  host: "117.50.177.182"
+  port: 6379
+  password: "A59chf#33"
+
+
+
+
+redis_key:
+  dice_key: "dice_state_"
+  dice_score_key: "dice_score_"
+  dice_score_type_key: "dice_score_type_"
+  game_created_key: "game_created_"
+  room_created_key: "room_created_"
+  room_list_key: "room_list"
+

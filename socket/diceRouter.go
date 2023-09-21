@@ -2,14 +2,13 @@ package socket
 
 import (
 	"app-bff/mod"
-	"app-bff/pkg/config"
 	"app-bff/pkg/utils"
 	"app-bff/socket/common"
 	"app-bff/socket/types"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
+	"strconv"
 )
 
 func (server *WebSocketServer) StartThrowsHandler(c *Client, msg *types.Message) {
@@ -21,10 +20,9 @@ func (server *WebSocketServer) StartThrowsHandler(c *Client, msg *types.Message)
 		message.Error = err.Error()
 	}
 
-	// TODO 1是写死的,后续换成userid
-	key := fmt.Sprintf("%s%d", config.GetString("redis_key.dice_key"), 1)
+	key := common.GetDiceKey(c.Game.ID, strconv.Itoa(c.Game.Round), c.ID)
 
-	diceValue := common.GetDiceValue(fmt.Sprintf("%s%d", config.GetString("redis_key.dice_key"), 1), nil)
+	diceValue := common.GetDiceValue(key)
 
 	locked_indexs := utils.MapToSliceString(args, "locked_indexs")
 
@@ -61,10 +59,10 @@ func (server *WebSocketServer) SetScoreHandler(c *Client, msg *types.Message) {
 	if err != nil {
 		message.Error = err.Error()
 	}
-	DiceValue := common.GetDiceValue(fmt.Sprintf("%s%d", config.GetString("redis_key.dice_key"), 1), nil)
+	dk := common.GetDiceKey(c.Game.ID, strconv.Itoa(c.Game.Round), c.ID)
+	DiceValue := common.GetDiceValue(dk)
 
-	// TODO 1是写死的,后续换成userid
-	key := fmt.Sprintf("%s%d", config.GetString("redis_key.dice_score_key"), 1)
+	key := common.GetScoreKey(c.Game.ID, strconv.Itoa(c.Game.Round), c.ID)
 
 	DiceScore := &types.DiceScore{}
 	// 获取redis的值,如果没有,代表是新的一轮

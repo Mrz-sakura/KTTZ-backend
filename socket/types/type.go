@@ -44,6 +44,9 @@ var (
 	SET_SCORE    = "set_score"
 	GAME_CREATED = "game_created"
 	JOIN_ROOM    = "join_room"
+	ROOMLIST     = "room_list"
+	ROOM_CREATED = "room_created"
+	GETGAME      = "get_game" // 获取游戏详情
 )
 
 var MsgTypeMap = map[string]string{

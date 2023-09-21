@@ -7,4 +7,7 @@ func (server *WebSocketServer) InitRoutes() {
 	server.routes[types.START_THROWS] = server.StartThrowsHandler
 	server.routes[types.SET_SCORE] = server.SetScoreHandler
 	server.routes[types.GAME_CREATED] = server.HandleCreateGame
+	server.routes[types.ROOM_CREATED] = server.HandleCreateRoom
+	server.routes[types.ROOMLIST] = server.HandleGetRoomList
+	//server.routes[types.GETGAME] = server.HandleGetRoomList
 }
