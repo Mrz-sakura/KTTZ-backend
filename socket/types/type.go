@@ -37,6 +37,7 @@ type RoomInfo struct {
 	Players     map[string]bool `json:"players"`
 	CreatedTime time.Time       `json:"created_time"`
 	CreatedUser string          `json:"created_user"`
+	IsGameStart bool            `json:"is_game_start"` // 是否已经开始游戏
 }
 
 var (
@@ -45,8 +46,10 @@ var (
 	GAME_CREATED = "game_created"
 	JOIN_ROOM    = "join_room"
 	ROOMLIST     = "room_list"
+	ROOMINFO     = "room_info"
 	ROOM_CREATED = "room_created"
 	GETGAME      = "get_game" // 获取游戏详情
+	LEAVE_ROOM   = "leave_room"
 )
 
 var MsgTypeMap = map[string]string{

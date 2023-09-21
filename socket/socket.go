@@ -46,6 +46,7 @@ type Room struct {
 	Players     map[*Client]bool `json:"players"`
 	CreatedTime time.Time        `json:"created_time"`
 	CreatedUser string           `json:"created_user"`
+	IsGameStart bool             `json:"is_game_start"` // 是否已经开始游戏
 }
 
 type Client struct {
@@ -102,7 +103,7 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 
 	defer func() {
 		server.clients.Delete(clientID)
-		fmt.Println("================================================================1111")
+		fmt.Println("======用户退出 ID======>", clientID)
 		conn.Close()
 	}()
 
@@ -112,6 +113,7 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 			fmt.Println("Read Error:", err)
 			return
 		}
+		fmt.Println("gxxxxxxxxpe=>")
 
 		var message types.Message
 		if err := json.Unmarshal(msg, &message); err != nil {
@@ -134,12 +136,6 @@ func (server *WebSocketServer) HandleClients(c *gin.Context) {
 			}
 			server.JoinRoom(client, roomID)
 
-		} else if message.Type == "leave_room" {
-			roomID, ok := message.Data["room_id"].(string)
-			if !ok {
-				roomID = ""
-			}
-			server.LeaveRoom(client, roomID)
 		} else if message.Type == "player_action" {
 			gameID, ok := message.Data["game_id"].(string)
 			if ok {
@@ -172,6 +168,23 @@ func (server *WebSocketServer) BroadcastMessage(client *Client, message *types.M
 		}
 	} else {
 		fmt.Printf("No room found with name: %s\n", roomID)
+	}
+}
+
+// 系统广播
+func (server *WebSocketServer) BroadSysMessage(roomID string, message *types.Message) {
+	server.roomsMutex.Lock()
+	defer server.roomsMutex.Unlock()
+
+	room, err := server.GetRoomByIDIFExist(roomID)
+	if err != nil {
+		fmt.Printf("没有找到对应的房间信息 %s\n", roomID)
+		return
+	}
+	for client := range room.Players {
+		if err := client.conn.WriteJSON(message); err != nil {
+			fmt.Println("Broadcast Error:", err)
+		}
 	}
 }
 func (server *WebSocketServer) SendMessageToClient(client *Client, message *types.Message) {
@@ -209,6 +222,7 @@ func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 	response.Data = map[string]interface{}{
 		"room_id":     roomID,
 		"client_list": clientList,
+		"room_info":   server.RoomClientToInfo(room),
 	}
 	response.From = &types.ClientInfo{ID: client.ID}
 
@@ -219,22 +233,6 @@ func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 	}
 
 	server.BroadcastMessage(client, response)
-}
-
-func (server *WebSocketServer) LeaveRoom(client *Client, roomName string) {
-	server.roomsMutex.Lock()
-	defer server.roomsMutex.Unlock()
-
-	room, exists := server.Rooms[roomName]
-	if exists {
-		delete(room.Players, client)
-		if len(room.Players) == 0 {
-			delete(server.Rooms, roomName) // 删除空房间
-		}
-		client.Room = nil // 清除客户端的房间引用
-	} else {
-		fmt.Printf("No room found with name: %s\n", roomName)
-	}
 }
 
 // 新方法来创建一个游戏
