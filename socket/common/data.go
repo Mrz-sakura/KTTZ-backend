@@ -22,8 +22,13 @@ func GenerateData(key string, value interface{}, data map[string]interface{}) ma
 func GetDiceKey(gameID string, partID string, userID string) string {
 	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_key"), gameID, partID, userID)
 }
-func GetScoreKey(gameID string, partID string, userID string) string {
-	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_score_key"), gameID, partID, userID)
+
+func GetDiceRoundsKey(gameID string, userID string) string {
+	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_round_key"), gameID, userID)
+}
+
+func GetScoreKey(gameID string, userID string) string {
+	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_score_key"), gameID, userID)
 }
 
 func GetGameCreatedKey(gameID string) string {
@@ -99,17 +104,6 @@ func GetDiceScoreType(key string, value interface{}) *types.DiceScore {
 	}
 
 	return diceScore
-}
-
-func CheckReward(score *types.DiceScore) {
-	var sum int
-	if score.Reward != 0 {
-		return
-	}
-	sum = (score.One + score.Two + score.Three + score.Four + score.Five + score.Six)
-	if sum >= 63 {
-		score.Reward = 35
-	}
 }
 
 // 检测四骰同花
@@ -219,17 +213,6 @@ func CheckKT(arr []int) int {
 	}
 
 	return 0
-}
-
-// 获取总和
-func GetSum(score *types.DiceScore) int {
-	var sum int
-
-	sum = (score.One + score.Two + score.Three + score.Four + score.Five + score.Six + score.STTH + score.Reward + score.HL + score.DS + score.XS + score.KT)
-
-	score.Sum = sum
-
-	return sum
 }
 
 func CheckIsNextRound() {

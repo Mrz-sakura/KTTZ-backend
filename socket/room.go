@@ -70,6 +70,7 @@ func (server *WebSocketServer) HandleCreateRoom(client *Client, message *types.M
 		"room_id":     roomID,
 		"client_list": clientList,
 		"room_list":   rooms,
+		"room_info":   server.RoomClientToInfo(room),
 	}
 	response.From = &types.ClientInfo{ID: client.ID}
 
@@ -79,7 +80,7 @@ func (server *WebSocketServer) HandleCreateRoom(client *Client, message *types.M
 		return
 	}
 
-	server.BroadcastMessage(client, response)
+	server.BroadAllClientsMessage(response)
 }
 
 func (server *WebSocketServer) GetRoomClients(roomID string) ([]string, error) {
@@ -145,6 +146,26 @@ func (server *WebSocketServer) InsertRoom(roomID string, roomInfo *types.RoomInf
 
 	return server.Redis.HSet(context.Background(), roomsKey, roomID, roomData).Err()
 }
+func (server *WebSocketServer) UpdateRoom(room *Room) (*types.RoomInfo, error) {
+	server.Rooms[room.ID] = room
+
+	roomsKey := common.GetRoomListKey()
+	key := common.GetRoomCreatedKey(room.ID)
+
+	roomInfo := server.RoomClientToInfo(room)
+	roomData, err := json.Marshal(roomInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = server.Redis.Set(context.Background(), key, roomData, 0).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	err = server.Redis.HSet(context.Background(), roomsKey, room.ID, roomData).Err()
+	return roomInfo, err
+}
 func (server *WebSocketServer) DeleteRoom(roomID string) error {
 	roomsKey := common.GetRoomListKey()
 	key := common.GetRoomCreatedKey(roomID)
@@ -189,14 +210,32 @@ func (server *WebSocketServer) DeleteRoom(roomID string) error {
 	if len(errs) > 0 {
 		return fmt.Errorf("deletion errors: %v", errs)
 	}
+	server.BroadAllClientsMessage(&types.Message{Type: types.DELETE_ROOM})
+
+	return nil
+}
+func (server *WebSocketServer) DeleteRoomClient(client *Client, roomID string) error {
+	room, err := server.GetRoomByIDIFExist(roomID)
+	if err != nil {
+		return err
+	}
+
+	delete(room.Players, client)
+
+	_, err = server.UpdateRoom(room)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (server *WebSocketServer) LeaveRoom(client *Client, message *types.Message) {
-	//server.roomsMutex.Lock()
-	//defer server.roomsMutex.Unlock()
+
 	response := &types.Message{}
+	response.Type = types.LEAVE_ROOM
+	response.From = &types.ClientInfo{ID: client.ID}
+
 	roomID := utils.MapToString(message.Data, "room_id")
 
 	if client.Room == nil || client.Room.ID == "" {
@@ -212,7 +251,11 @@ func (server *WebSocketServer) LeaveRoom(client *Client, message *types.Message)
 		return
 	}
 
+	client.Room = nil // 清除客户端的房间引用
+
 	delete(room.Players, client)
+	_, err = server.UpdateRoom(room)
+
 	if len(room.Players) == 0 {
 		err = server.DeleteRoom(roomID)
 		if err != nil {
@@ -220,15 +263,12 @@ func (server *WebSocketServer) LeaveRoom(client *Client, message *types.Message)
 			server.SendMessageToClient(client, response)
 			return
 		}
+		server.SendMessageToClient(client, response)
+	} else {
+		server.SendMessageToClient(client, response)
+		server.BroadSysMessage(roomID, response)
 	}
 
-	client.Room = nil // 清除客户端的房间引用
-
-	response.Type = types.LEAVE_ROOM
-	response.From = &types.ClientInfo{ID: client.ID}
-
-	server.SendMessageToClient(client, response)
-	server.BroadSysMessage(roomID, response)
 }
 
 func (server *WebSocketServer) GetRoomList() ([]*types.RoomInfo, error) {

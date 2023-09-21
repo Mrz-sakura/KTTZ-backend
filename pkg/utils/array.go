@@ -11,14 +11,6 @@ func ArrayStrContainsInt(arr []string, x int) bool {
 	}
 	return false
 }
-func ArrayIntContainsInt(arr []int, x int) bool {
-	for _, n := range arr {
-		if n == x {
-			return true
-		}
-	}
-	return false
-}
 
 func ArrayStrToArrayInt(arr []string) ([]int, error) {
 	var err error
@@ -30,4 +22,13 @@ func ArrayStrToArrayInt(arr []string) ([]int, error) {
 		}
 	}
 	return ret, nil
+}
+
+func SContains[T comparable](slice []T, elem T) bool {
+	for _, v := range slice {
+		if v == elem {
+			return true
+		}
+	}
+	return false
 }

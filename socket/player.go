@@ -20,6 +20,18 @@ func (server *WebSocketServer) GetPlayersByClient(Players map[*Client]bool) map[
 	return players
 }
 
+func (server *WebSocketServer) GetPlayersSliceByClient(Players []*Client) []string {
+	if Players == nil {
+		return []string{}
+	}
+	
+	players := make([]string, len(Players))
+	for _, v := range Players {
+		players = append(players, v.ID)
+	}
+	return players
+}
+
 func (server *WebSocketServer) GetPlayerActionsByClient(PlayerActions map[*Client]bool) map[string]bool {
 	players := make(map[string]bool)
 	for player, v := range PlayerActions {

@@ -22,6 +22,23 @@ func MapToSliceString(args map[string]interface{}, key string) []string {
 	}
 	return indexStrings
 }
+func MapToSliceInt(args map[string]interface{}, key string) []int {
+	interfaces, ok := args[key].([]interface{})
+	if !ok {
+		fmt.Println("args KEY ERROR :", key)
+		return make([]int, 0)
+	}
+	indexInt := make([]int, len(interfaces))
+
+	for i, val := range interfaces {
+		indexInt[i], ok = val.(int)
+		if !ok {
+			fmt.Println("args i ERROR :", i)
+			return make([]int, 0)
+		}
+	}
+	return indexInt
+}
 
 func MapToString(args map[string]interface{}, key string) string {
 	//args := make(map[string]interface{})

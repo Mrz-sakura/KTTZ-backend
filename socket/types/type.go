@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type Message struct {
 	Type  string                 `json:"type"`
@@ -19,16 +21,35 @@ type ClientInfo struct {
 }
 
 type GameInfo struct {
-	ID            string          `json:"id"`
-	RoomID        string          `json:"room_id"`
-	RoomName      string          `json:"room_name"`
-	Round         int             `json:"round"`      // 新增字段，表示当前回合
-	MaxRounds     int             `json:"max_rounds"` // 新增字段，表示最大回合数 12
-	Players       map[string]bool `json:"players"`
-	PlayerActions map[string]bool `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
-	CreatedTime   time.Time       `json:"created_time"`
-	EndTime       time.Time       `json:"end_time"`
-	CreatedUser   string          `json:"created_user"`
+	ID            string                `json:"id"`
+	RoomID        string                `json:"room_id"`
+	RoomName      string                `json:"room_name"`
+	Round         int                   `json:"round"`      // 新增字段，表示当前回合
+	MaxRounds     int                   `json:"max_rounds"` // 新增字段，表示最大回合数 12
+	Players       map[string]bool       `json:"players"`
+	PlayerActions map[string]bool       `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
+	CreatedTime   time.Time             `json:"created_time"`
+	EndTime       time.Time             `json:"end_time"`
+	CreatedUser   string                `json:"created_user"`
+	Dice          *Dice                 `json:"dice"`
+	IsEnd         bool                  `json:"is_end"`
+	RoundsInfo    *RoundsInfo           `json:"rounds_info"`
+	Scores        map[string]*DiceScore `json:"scores"`
+}
+
+type RoundsInfo struct {
+	CurrentPlayer        string   `json:"current_player"` // 当前正在游戏回合的玩家
+	CurrentPlayerActions int      `json:"current_player_actions"`
+	CompletedPlayer      []string `json:"completed_player"`
+	IsCompleted          bool     `json:"is_completed"`
+}
+
+type Dice struct {
+	GameID       string `json:"game_id"`
+	Round        int    `json:"round"`         // 轮数
+	Value        []int  `json:"value"`         // 骰子的值
+	LockedIndexs []int  `json:"locked_indexs"` // 本轮锁定的索引
+	Frequency    int    `json:"frequency"`     // 剩余次数
 }
 
 type RoomInfo struct {
@@ -41,15 +62,19 @@ type RoomInfo struct {
 }
 
 var (
-	START_THROWS = "start_throws"
-	SET_SCORE    = "set_score"
-	GAME_CREATED = "game_created"
-	JOIN_ROOM    = "join_room"
-	ROOMLIST     = "room_list"
-	ROOMINFO     = "room_info"
-	ROOM_CREATED = "room_created"
-	GETGAME      = "get_game" // 获取游戏详情
-	LEAVE_ROOM   = "leave_room"
+	START_THROWS      = "start_throws"
+	SET_SCORE         = "set_score"
+	GAME_CREATED      = "game_created"
+	JOIN_ROOM         = "join_room"
+	ROOMLIST          = "room_list"
+	ROOMINFO          = "room_info"
+	ROOM_CREATED      = "room_created"
+	GETGAME           = "get_game" // 获取游戏详情
+	LEAVE_ROOM        = "leave_room"
+	DELETE_ROOM       = "delete_room"
+	GAME_ROUND_START  = "game_round_start"
+	PLAYER_TURN_START = "player_turn_start" // 下一个玩家的回合开始
+	GAME_END          = "game_end"
 )
 
 var MsgTypeMap = map[string]string{
