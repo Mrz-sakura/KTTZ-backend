@@ -26,13 +26,13 @@ type WebSocketServer struct {
 	Redis *redis.Client
 }
 
-type Dice struct {
-	GameID       string `json:"game_id"`
-	Round        int    `json:"round"`         // 轮数
-	Value        []int  `json:"value"`         // 骰子的值
-	LockedIndexs []int  `json:"locked_indexs"` // 本轮锁定的索引
-	Frequency    int    `json:"frequency"`     // 剩余次数
-}
+//type Dice struct {
+//	GameID       string `json:"game_id"`
+//	Round        int    `json:"round"`         // 轮数
+//	Value        []int  `json:"value"`         // 骰子的值
+//	LockedIndexs []int  `json:"locked_indexs"` // 本轮锁定的索引
+//	Frequency    int    `json:"frequency"`     // 剩余次数
+//}
 
 type Room struct {
 	ID          string           `json:"id"`
@@ -149,8 +149,15 @@ func (server *WebSocketServer) BroadcastMessage(client *Client, message *types.M
 		fmt.Printf("No room found with name: %s\n", roomID)
 	}
 }
-func (server *WebSocketServer) BroadGameMessage(client *Client, game *Game, message *types.Message) {
+func (server *WebSocketServer) BroadGameMessage(game *Game, message *types.Message) {
 	for client := range game.Players {
+		if err := client.conn.WriteJSON(message); err != nil {
+			fmt.Println("Broadcast Error:", err)
+		}
+	}
+}
+func (server *WebSocketServer) BroadRoomMessage(room *Room, message *types.Message) {
+	for client := range room.Players {
 		if err := client.conn.WriteJSON(message); err != nil {
 			fmt.Println("Broadcast Error:", err)
 		}

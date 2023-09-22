@@ -11,5 +11,6 @@ func (server *WebSocketServer) InitRoutes() {
 	server.routes[types.ROOMLIST] = server.HandleGetRoomList
 	server.routes[types.ROOMINFO] = server.HandleGetRoomList
 	server.routes[types.LEAVE_ROOM] = server.LeaveRoom
+	server.routes[types.UPDATE_TMPLOCKS] = server.HandleUpdateTmpDiceLocks
 	//server.routes[types.GETGAME] = server.HandleGetRoomList
 }

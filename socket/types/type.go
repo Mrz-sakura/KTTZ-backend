@@ -21,20 +21,21 @@ type ClientInfo struct {
 }
 
 type GameInfo struct {
-	ID            string                `json:"id"`
-	RoomID        string                `json:"room_id"`
-	RoomName      string                `json:"room_name"`
-	Round         int                   `json:"round"`      // 新增字段，表示当前回合
-	MaxRounds     int                   `json:"max_rounds"` // 新增字段，表示最大回合数 12
-	Players       map[string]bool       `json:"players"`
-	PlayerActions map[string]bool       `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
-	CreatedTime   time.Time             `json:"created_time"`
-	EndTime       time.Time             `json:"end_time"`
-	CreatedUser   string                `json:"created_user"`
-	Dice          *Dice                 `json:"dice"`
-	IsEnd         bool                  `json:"is_end"`
-	RoundsInfo    *RoundsInfo           `json:"rounds_info"`
-	Scores        map[string]*DiceScore `json:"scores"`
+	ID            string                     `json:"id"`
+	RoomID        string                     `json:"room_id"`
+	RoomName      string                     `json:"room_name"`
+	Round         int                        `json:"round"`      // 新增字段，表示当前回合
+	MaxRounds     int                        `json:"max_rounds"` // 新增字段，表示最大回合数 12
+	Players       map[string]bool            `json:"players"`
+	PlayerActions map[string]bool            `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
+	CreatedTime   time.Time                  `json:"created_time"`
+	EndTime       time.Time                  `json:"end_time"`
+	CreatedUser   string                     `json:"created_user"`
+	Dice          *Dice                      `json:"dice"`
+	IsEnd         bool                       `json:"is_end"`
+	RoundsInfo    *RoundsInfo                `json:"rounds_info"`
+	Scores        map[string]*DiceScore      `json:"scores"`
+	ScoresValue   map[string]*DiceScoreValue `json:"scores_value"`
 }
 
 type RoundsInfo struct {
@@ -46,6 +47,7 @@ type RoundsInfo struct {
 
 type Dice struct {
 	GameID       string `json:"game_id"`
+	ClientID     string `json:"client_id"`     // 当前正在玩的人
 	Round        int    `json:"round"`         // 轮数
 	Value        []int  `json:"value"`         // 骰子的值
 	LockedIndexs []int  `json:"locked_indexs"` // 本轮锁定的索引
@@ -69,12 +71,17 @@ var (
 	ROOMLIST          = "room_list"
 	ROOMINFO          = "room_info"
 	ROOM_CREATED      = "room_created"
-	GETGAME           = "get_game" // 获取游戏详情
+	ROOM_UPDATE       = "room_update" // 游戏信息更新
+	GETGAME           = "get_game"    // 获取游戏详情
 	LEAVE_ROOM        = "leave_room"
 	DELETE_ROOM       = "delete_room"
 	GAME_ROUND_START  = "game_round_start"
 	PLAYER_TURN_START = "player_turn_start" // 下一个玩家的回合开始
 	GAME_END          = "game_end"
+	GAME_UPDATE       = "game_update"  // 游戏信息更新
+	SCORE_UPDATE      = "score_update" // 游戏信息更新
+	UPDATE_DICELOCKS  = "update_dice_locks"
+	UPDATE_TMPLOCKS   = "update_tmp_locks"
 )
 
 var MsgTypeMap = map[string]string{
@@ -90,6 +97,7 @@ var (
 	FOUR   = "four"
 	FIVE   = "five"
 	SIX    = "six"
+	IntS   = "ints"   // 奖励分
 	REWARD = "reward" // 奖励分
 	ALL    = "all"
 	STTH   = "stth" // 四骰同花

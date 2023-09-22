@@ -6,6 +6,7 @@ import (
 	"app-bff/socket/types"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"strconv"
 )
@@ -20,23 +21,15 @@ func (server *WebSocketServer) HandlerStartThrows(c *Client, message *types.Mess
 
 	dice, err := server.CreateDiceValue(c, message)
 
-	if c.Game.RoundsInfo.CurrentPlayerActions >= 3 {
-		// 发送一个信号到CompletedChan，表示该玩家已完成回合
-		c.Game.RoundsInfo.CompletedChan <- c
-
-		// 重置当前玩家和行动次数，以便在NoticePlayersRound中选择下一个玩家
-		c.Game.RoundsInfo.CurrentPlayer = nil
-		c.Game.RoundsInfo.CurrentPlayerActions = 0
-	}
-
-	_, err = server.UpdateGame(c.Game)
+	_, err = server.UpdateGame(c, c.Game)
 
 	message = &types.Message{
 		Type: message.Type,
 		From: &types.ClientInfo{ID: c.ID},
+		Data: map[string]interface{}{
+			"dice_values": dice,
+		},
 	}
-
-	message.Data = common.GenerateData("dice_values", dice, nil)
 
 	if err != nil {
 		message.Error = err.Error()
@@ -44,13 +37,17 @@ func (server *WebSocketServer) HandlerStartThrows(c *Client, message *types.Mess
 
 	// 广播消息
 	server.BroadcastMessage(c, message)
-
 }
 
+// 临时更新选中的值
+func (server *WebSocketServer) HandleUpdateTmpDiceLocks(c *Client, message *types.Message) {
+	server.BroadGameMessage(c.Game, message)
+}
 func (server *WebSocketServer) CreateDiceValue(c *Client, message *types.Message) (*types.Dice, error) {
 	lockedIndexs := utils.MapToSliceInt(message.Data, "locked_indexs")
 
-	key := common.GetDiceKey(c.Game.ID, strconv.Itoa(c.Game.Round), c.ID)
+	fmt.Println(lockedIndexs, "lockedI=======ndexslockedIndexslockedIndexslockedIndexs")
+	key := common.GetDiceKey(c.Game.ID, c.Game.Round, c.ID)
 	diceValue, err := server.GetDiceValue(key, c)
 
 	if err != nil {
@@ -66,21 +63,27 @@ func (server *WebSocketServer) CreateDiceValue(c *Client, message *types.Message
 	diceValue.Frequency--
 	c.Game.RoundsInfo.CurrentPlayerActions++
 
-	for i := 0; i < 5; i++ {
+	// 去掉第0个的选项
+	for i := 1; i < 6; i++ {
 		// 如果当前索引在锁定索引列表中，则不生成新的随机数
 		if len(lockedIndexs) > 0 && utils.SContains(lockedIndexs, i) {
 			continue
 		}
-		diceValue.Value[i] = rand.Intn(6) + 1
+		diceValue.Value[i-1] = rand.Intn(6) + 1
 	}
 
-	c.Game.Dice = (*Dice)(diceValue)
-	_, err = server.UpdateGame(c.Game)
+	c.Game.Dice = diceValue
+	_, err = server.UpdateGame(c, c.Game)
 	if err != nil {
 		return nil, err
 	}
 
 	err = server.UpdateDice(c, c.Game)
+	if err != nil {
+		return nil, err
+	}
+
+	err = server.UpdateDiceLocks(c, c.Game)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +100,12 @@ func (server *WebSocketServer) UpdateDice(c *Client, game *Game) error {
 		return err
 	}
 
+	dcKey := common.GetDiceKey(c.Game.ID, c.Game.Round, c.ID)
+	err = server.Redis.HSet(context.Background(), dcKey, game.Dice.Frequency, diceData).Err()
+	if err != nil {
+		return err
+	}
+
 	return server.Redis.HSet(context.Background(), key, game.Round, diceData).Err()
 }
 
@@ -106,7 +115,7 @@ func (server *WebSocketServer) GetDiceValue(key string, c *Client) (*types.Dice,
 		return nil, err
 	}
 
-	var dice *types.Dice
+	dice := &types.Dice{}
 
 	err = json.Unmarshal([]byte(diceValue), dice)
 	if err != nil {
@@ -115,3 +124,57 @@ func (server *WebSocketServer) GetDiceValue(key string, c *Client) (*types.Dice,
 
 	return dice, nil
 }
+
+func (server *WebSocketServer) HandlerUpdateDicelocks(c *Client, message *types.Message) {
+	//isCanPlay := server.CheckPlayerCanPlay(c, message)
+	//if !isCanPlay {
+	//	server.SendMessageToClient(c, message)
+	//	return
+	//}
+	lockedIndexs := utils.MapToSliceInt(message.Data, "locked_indexs")
+
+	c.Game.Dice.LockedIndexs = lockedIndexs
+	err := server.UpdateDiceLocks(c, c.Game)
+
+	if err != nil {
+		message.Error = err.Error()
+		server.SendMessageToClient(c, message)
+		return
+	}
+
+	_, err = server.UpdateGame(c, c.Game)
+
+	if err != nil {
+		message.Error = err.Error()
+		server.SendMessageToClient(c, message)
+		return
+	}
+}
+
+// 更新骰子锁,按回合更新
+func (server *WebSocketServer) UpdateDiceLocks(c *Client, game *Game) error {
+	key := common.GetDiceRoundsLocksKey(game.ID, game.Round, c.ID)
+
+	diceData, err := json.Marshal(game.Dice.LockedIndexs)
+	if err != nil {
+		return err
+	}
+
+	return server.Redis.HSet(context.Background(), key, game.Round, diceData).Err()
+}
+
+//func (server *WebSocketServer) GetDiceValue(key string, c *Client) (*types.Dice, error) {
+//	diceValue, err := server.Redis.Get(context.Background(), key).Result()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	dice := &types.Dice{}
+//
+//	err = json.Unmarshal([]byte(diceValue), dice)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return dice, nil
+//}

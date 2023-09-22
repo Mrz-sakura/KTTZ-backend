@@ -12,28 +12,31 @@ import (
 )
 
 type Game struct {
-	ID            string                 `json:"id"`
-	RoomID        string                 `json:"room_id"`
-	RoomName      string                 `json:"room_name"`
-	Round         int                    `json:"round"`      // 新增字段，表示当前回合
-	MaxRounds     int                    `json:"max_rounds"` // 新增字段，表示最大回合数 12
-	Players       map[*Client]bool       `json:"players"`
-	PlayerActions map[*Client]bool       `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
-	CreatedTime   time.Time              `json:"created_time"`
-	IsEnd         bool                   `json:"is_end"`
-	EndTime       time.Time              `json:"end_time"`
-	CreatedUser   string                 `json:"created_user"`
-	Dice          *Dice                  `json:"dices"`
-	RoundsInfo    *Rounds                `json:"rounds_info"`
-	Scores        map[*Client]*DiceScore `json:"scores"`
+	ID            string                            `json:"id"`
+	RoomID        string                            `json:"room_id"`
+	RoomName      string                            `json:"room_name"`
+	Round         int                               `json:"round"`      // 新增字段，表示当前回合
+	MaxRounds     int                               `json:"max_rounds"` // 新增字段，表示最大回合数 12
+	Players       map[*Client]bool                  `json:"players"`
+	PlayerActions map[*Client]bool                  `json:"player_actions"` // 新增字段，记录每个玩家是否已操作
+	CreatedTime   time.Time                         `json:"created_time"`
+	IsEnd         bool                              `json:"is_end"`
+	EndTime       time.Time                         `json:"end_time"`
+	CreatedUser   string                            `json:"created_user"`
+	Dice          *types.Dice                       `json:"dices"`
+	RoundsInfo    *Rounds                           `json:"rounds_info"`
+	Scores        map[*Client]*types.DiceScore      `json:"scores"`
+	ScoresValue   map[*Client]*types.DiceScoreValue `json:"scores"`
 }
 
 type Rounds struct {
-	CurrentPlayer        *Client   `json:"current_player"` // 当前正在游戏回合的玩家
-	CurrentPlayerActions int       `json:"current_player_actions"`
-	CompletedPlayer      []*Client `json:"completed_player"`
-	IsCompleted          bool      `json:"is_completed"`
-	CompletedChan        chan *Client
+	CurrentPlayer           *Client               `json:"current_player"` // 当前正在游戏回合的玩家
+	CurrentPlayerActions    int                   `json:"current_player_actions"`
+	CurrentPlayerScore      *types.DiceScore      `json:"current_player_score"`
+	CurrentPlayerScoreValue *types.DiceScoreValue `json:"current_player_score"`
+	CompletedPlayer         []*Client             `json:"completed_player"`
+	IsCompleted             bool                  `json:"is_completed"`
+	CompletedChan           chan *Client
 }
 
 // 新方法来创建一个游戏
@@ -55,6 +58,7 @@ func (server *WebSocketServer) HandleCreateGame(client *Client, message *types.M
 		Data: map[string]interface{}{
 			"game_id":   gameID,
 			"game_info": server.GameClientToInfo(game),
+			"message":   "开始游戏啦~~~~准备第一回合!!!!",
 		},
 		From: &types.ClientInfo{
 			ID:     client.ID,
@@ -137,13 +141,9 @@ func (server *WebSocketServer) CreateGame(gameID string, client *Client) (*Game,
 		PlayerActions: make(map[*Client]bool),
 		CreatedTime:   time.Now(),
 		CreatedUser:   client.ID,
-		RoundsInfo: &Rounds{
-			CurrentPlayer:        nil,
-			CurrentPlayerActions: 0,
-			CompletedPlayer:      make([]*Client, 0),
-			IsCompleted:          false,
-			CompletedChan:        make(chan *Client),
-		},
+		RoundsInfo:    server.InitRoundsInfo(),
+		Scores:        make(map[*Client]*types.DiceScore),
+		ScoresValue:   make(map[*Client]*types.DiceScoreValue),
 	}
 
 	room, err := server.GetRoomByIDIFExist(client.Room.ID)
@@ -151,7 +151,20 @@ func (server *WebSocketServer) CreateGame(gameID string, client *Client) (*Game,
 		for player := range room.Players {
 			game.Players[player] = true
 			game.PlayerActions[player] = false // 初始化玩家行动状态为false
+			game.ScoresValue[player] = &types.DiceScoreValue{}
+			game.Scores[player] = &types.DiceScore{}
 		}
+
+		room.IsGameStart = true
+		_, err = server.UpdateRoom(client, room)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, err = server.UpdateGame(client, game)
+	if err != nil {
+		return nil, err
 	}
 
 	key := common.GetGameCreatedKey(gameID)
@@ -190,8 +203,9 @@ func (server *WebSocketServer) InsertGame(gameID string, gameInfo *types.GameInf
 
 	return nil
 }
-func (server *WebSocketServer) UpdateGame(game *Game) (*types.GameInfo, error) {
+func (server *WebSocketServer) UpdateGame(c *Client, game *Game) (*types.GameInfo, error) {
 	server.Games[game.ID] = game
+	c.Game = game
 
 	gamesKey := common.GetGameListKey()
 	key := common.GetGameCreatedKey(game.ID)
@@ -208,7 +222,13 @@ func (server *WebSocketServer) UpdateGame(game *Game) (*types.GameInfo, error) {
 	}
 
 	err = server.Redis.HSet(context.Background(), gamesKey, game.ID, gameData).Err()
-	return gameInfo, err
+	if err != nil {
+		return nil, err
+	}
+
+	server.SendGameInfo(game)
+
+	return gameInfo, nil
 }
 
 func (server *WebSocketServer) GetGameList() ([]*types.GameInfo, error) {
@@ -283,13 +303,14 @@ func (server *WebSocketServer) GetGameByID() (*types.GameInfo, error) {
 func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
 	// 递增回合数以准备下一轮
 	game.Round++
+	game.RoundsInfo = server.InitRoundsInfo()
 
 	// 检查当前回合数是否超过最大回合数
 	if game.Round > game.MaxRounds {
 		game.EndTime = time.Now() // 设置游戏结束时间
 		game.IsEnd = true
 
-		_, err := server.UpdateGame(game)
+		_, err := server.UpdateGame(c, game)
 
 		message := &types.Message{
 			Type: types.GAME_END,
@@ -306,15 +327,15 @@ func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
 			message.Error = err.Error()
 		}
 
-		server.BroadGameMessage(c, game, message)
+		server.BroadGameMessage(game, message)
 		return
 	}
 
-	game.Dice = &Dice{
+	game.Dice = &types.Dice{
 		GameID:       game.ID,
 		Round:        game.Round,
-		Value:        nil,
-		LockedIndexs: nil,
+		Value:        make([]int, 5),
+		LockedIndexs: make([]int, 5),
 		Frequency:    3,
 	}
 
@@ -335,20 +356,23 @@ func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
 		message.Error = err.Error()
 	}
 
-	_, err = server.UpdateGame(game)
+	_, err = server.UpdateGame(c, game)
 	if err != nil {
 		message.Error = err.Error()
 	}
 
-	server.BroadGameMessage(c, game, message)
+	server.BroadGameMessage(game, message)
 
 	time.Sleep(time.Second * 2)
 
 	// 开始通知玩家的回合开始
-	go server.NoticeNextPlayersRound(game)
+	go server.NoticeNextPlayersRound(c, game)
 
 	// 另一个goroutine用于检测所有玩家是否完成了回合
 	go server.CheckPlayerRoundsCompleted(c, game)
+
+	// 检测玩家是否设置了分数
+	//go server.CheckPlayerRoundsCompletedAndHasScore(c, game)
 }
 
 func (server *WebSocketServer) GameClientToInfo(game *Game) *types.GameInfo {
@@ -360,7 +384,7 @@ func (server *WebSocketServer) GameClientToInfo(game *Game) *types.GameInfo {
 		PlayerActions: server.GetPlayerActionsByClient(game.PlayerActions),
 		CreatedTime:   game.CreatedTime,
 		CreatedUser:   game.CreatedUser,
-		Dice:          (*types.Dice)(game.Dice),
+		Dice:          game.Dice,
 		Round:         game.Round,
 		MaxRounds:     game.MaxRounds,
 		EndTime:       game.EndTime,
@@ -369,7 +393,8 @@ func (server *WebSocketServer) GameClientToInfo(game *Game) *types.GameInfo {
 			CompletedPlayer: server.GetPlayersSliceByClient(game.RoundsInfo.CompletedPlayer),
 			IsCompleted:     game.RoundsInfo.IsCompleted,
 		},
-		Scores: server.GetScoresByClient(game.Scores),
+		Scores:      server.GetScoresByClient(game.Scores),
+		ScoresValue: server.GetScoresValueByClient(game.ScoresValue),
 	}
 	if game.RoundsInfo.CurrentPlayer != nil {
 		gameInfo.RoundsInfo.CurrentPlayer = game.RoundsInfo.CurrentPlayer.ID
@@ -379,7 +404,7 @@ func (server *WebSocketServer) GameClientToInfo(game *Game) *types.GameInfo {
 	return gameInfo
 }
 
-func (server *WebSocketServer) NoticeNextPlayersRound(game *Game) {
+func (server *WebSocketServer) NoticeNextPlayersRound(c *Client, game *Game) {
 	for player := range game.Players {
 		// 跳过已经完成回合的玩家
 		if contains(game.RoundsInfo.CompletedPlayer, player) {
@@ -390,7 +415,11 @@ func (server *WebSocketServer) NoticeNextPlayersRound(game *Game) {
 		if game.RoundsInfo.CurrentPlayer == nil || game.RoundsInfo.CurrentPlayerActions >= 3 {
 			game.RoundsInfo.CurrentPlayer = player
 			game.RoundsInfo.CurrentPlayerActions = 0
+
+			game.Dice = server.InitDice(player, game)
 		}
+
+		_, err := server.UpdateGame(c, game)
 
 		// 通知当前玩家他的回合开始
 		message := &types.Message{
@@ -401,6 +430,11 @@ func (server *WebSocketServer) NoticeNextPlayersRound(game *Game) {
 				"player_id": game.RoundsInfo.CurrentPlayer.ID,
 				"message":   fmt.Sprintf("亲爱的玩家 %s,你的回合开始！", game.RoundsInfo.CurrentPlayer.ID),
 			},
+		}
+		if err != nil {
+			message.Error = err.Error()
+			server.BroadGameMessage(game, message)
+			return
 		}
 
 		server.SendMessageToClient(game.RoundsInfo.CurrentPlayer, message)
@@ -424,7 +458,7 @@ func (server *WebSocketServer) CheckPlayerRoundsCompleted(c *Client, game *Game)
 		completedPlayer := <-game.RoundsInfo.CompletedChan
 		game.RoundsInfo.CompletedPlayer = append(game.RoundsInfo.CompletedPlayer, completedPlayer)
 
-		_, err := server.UpdateGame(game)
+		_, err := server.UpdateGame(c, game)
 		if err != nil {
 			return
 		}
@@ -432,7 +466,7 @@ func (server *WebSocketServer) CheckPlayerRoundsCompleted(c *Client, game *Game)
 		if len(game.RoundsInfo.CompletedPlayer) >= len(game.Players) {
 			game.RoundsInfo.IsCompleted = true
 
-			_, err := server.UpdateGame(game)
+			_, err := server.UpdateGame(c, game)
 			if err != nil {
 				return
 			}
@@ -441,8 +475,21 @@ func (server *WebSocketServer) CheckPlayerRoundsCompleted(c *Client, game *Game)
 			server.StartGameRound(c, game)
 			return
 		} else {
-			server.NoticeNextPlayersRound(game)
+			server.NoticeNextPlayersRound(c, game)
 		}
+	}
+}
+
+// 检测玩家是否完成了3次骰子操作并且设置了分数
+func (server *WebSocketServer) CheckPlayerRoundsCompletedAndHasScore(c *Client, game *Game) {
+	if c.Game.RoundsInfo.CurrentPlayerScore != nil {
+		// 发送一个信号到CompletedChan，表示该玩家已完成回合
+		c.Game.RoundsInfo.CompletedChan <- c
+		// 重置当前玩家和行动次数，以便在NoticePlayersRound中选择下一个玩家
+		c.Game.RoundsInfo.CurrentPlayer = nil
+		c.Game.RoundsInfo.CurrentPlayerActions = 0
+		c.Game.RoundsInfo.CurrentPlayerScore = nil
+
 	}
 }
 
@@ -450,13 +497,49 @@ func (server *WebSocketServer) CheckPlayerCanPlay(c *Client, message *types.Mess
 	// 首先，检查是否是当前玩家的回合
 	if c.Game.RoundsInfo.CurrentPlayer != c {
 		message.Error = "不是你的回合"
-		return true
+		return false
 	}
 
 	// 然后，检查该玩家是否还有剩余的行动次数
 	if c.Game.RoundsInfo.CurrentPlayerActions >= 3 {
 		message.Error = "你已经用完了本回合的所有行动次数"
-		return true
+		return false
 	}
-	return false
+	return true
+}
+
+// 广播给游戏的所有人告知游戏状态更新
+func (server *WebSocketServer) SendGameInfo(game *Game) {
+	message := &types.Message{
+		Type: types.GAME_UPDATE,
+		Data: map[string]interface{}{
+			"game_id":   game.ID,
+			"game_info": server.GameClientToInfo(game),
+		},
+	}
+
+	server.BroadGameMessage(game, message)
+}
+
+func (server *WebSocketServer) InitRoundsInfo() *Rounds {
+	return &Rounds{
+		CurrentPlayer:           nil,
+		CurrentPlayerActions:    0,
+		CompletedPlayer:         make([]*Client, 0),
+		IsCompleted:             false,
+		CompletedChan:           make(chan *Client),
+		CurrentPlayerScore:      &types.DiceScore{},
+		CurrentPlayerScoreValue: &types.DiceScoreValue{},
+	}
+}
+
+func (server *WebSocketServer) InitDice(player *Client, game *Game) (dice *types.Dice) {
+	return &types.Dice{
+		GameID:       game.ID,
+		ClientID:     player.ID,
+		Round:        game.Round,
+		Value:        make([]int, 5),
+		LockedIndexs: make([]int, 5),
+		Frequency:    3,
+	}
 }

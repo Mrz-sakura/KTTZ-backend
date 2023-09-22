@@ -146,7 +146,7 @@ func (server *WebSocketServer) InsertRoom(roomID string, roomInfo *types.RoomInf
 
 	return server.Redis.HSet(context.Background(), roomsKey, roomID, roomData).Err()
 }
-func (server *WebSocketServer) UpdateRoom(room *Room) (*types.RoomInfo, error) {
+func (server *WebSocketServer) UpdateRoom(c *Client, room *Room) (*types.RoomInfo, error) {
 	server.Rooms[room.ID] = room
 
 	roomsKey := common.GetRoomListKey()
@@ -164,6 +164,9 @@ func (server *WebSocketServer) UpdateRoom(room *Room) (*types.RoomInfo, error) {
 	}
 
 	err = server.Redis.HSet(context.Background(), roomsKey, room.ID, roomData).Err()
+
+	server.SendRoomInfo(c, room)
+
 	return roomInfo, err
 }
 func (server *WebSocketServer) DeleteRoom(roomID string) error {
@@ -222,7 +225,7 @@ func (server *WebSocketServer) DeleteRoomClient(client *Client, roomID string) e
 
 	delete(room.Players, client)
 
-	_, err = server.UpdateRoom(room)
+	_, err = server.UpdateRoom(client, room)
 	if err != nil {
 		return err
 	}
@@ -230,6 +233,18 @@ func (server *WebSocketServer) DeleteRoomClient(client *Client, roomID string) e
 	return nil
 }
 
+// 广播给游戏的所有人告知游戏状态更新
+func (server *WebSocketServer) SendRoomInfo(c *Client, room *Room) {
+	message := &types.Message{
+		Type: types.ROOM_UPDATE,
+		Data: map[string]interface{}{
+			"room_id":   room.ID,
+			"room_info": server.RoomClientToInfo(room),
+		},
+	}
+
+	server.BroadRoomMessage(room, message)
+}
 func (server *WebSocketServer) LeaveRoom(client *Client, message *types.Message) {
 
 	response := &types.Message{}
@@ -254,7 +269,7 @@ func (server *WebSocketServer) LeaveRoom(client *Client, message *types.Message)
 	client.Room = nil // 清除客户端的房间引用
 
 	delete(room.Players, client)
-	_, err = server.UpdateRoom(room)
+	_, err = server.UpdateRoom(client, room)
 
 	if len(room.Players) == 0 {
 		err = server.DeleteRoom(roomID)

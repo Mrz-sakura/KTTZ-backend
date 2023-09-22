@@ -1,6 +1,6 @@
 server:
   host: "0.0.0.0"
-  port: 1001
+  port: 8848
 
 redis:
   host: "117.50.177.182"
@@ -12,9 +12,13 @@ redis:
 
 redis_key:
   dice_key: "dice_state_"
+  dice_round_key: "dice_round_"
   dice_score_key: "dice_score_"
+  dice_score_value_key: "dice_score_value_"
+  dice_round_locks_key: "dice_round_locks_"
   dice_score_type_key: "dice_score_type_"
   game_created_key: "game_created_"
   room_created_key: "room_created_"
   room_list_key: "room_list"
+  game_list_key: "game_list_"
 

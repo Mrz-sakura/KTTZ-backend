@@ -1,11 +1,7 @@
 package common
 
 import (
-	"app-bff/mod"
 	"app-bff/pkg/config"
-	"app-bff/socket/types"
-	"context"
-	"encoding/json"
 	"fmt"
 )
 
@@ -19,36 +15,25 @@ func GenerateData(key string, value interface{}, data map[string]interface{}) ma
 }
 
 // gameID 游戏的ID,partID 对局回合的ID,userID 用户ID
-func GetDiceKey(gameID string, partID string, userID string) string {
-	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_key"), gameID, partID, userID)
+func GetDiceKey(gameID string, roundID int, userID string) string {
+	return fmt.Sprintf("%s_%s_%d_%s", config.GetString("redis_key.dice_key"), gameID, roundID, userID)
 }
 
 func GetDiceRoundsKey(gameID string, userID string) string {
-	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_round_key"), gameID, userID)
+	return fmt.Sprintf("%s_%s_%s", config.GetString("redis_key.dice_round_key"), gameID, userID)
+}
+func GetDiceRoundsLocksKey(gameID string, roundID int, userID string) string {
+	return fmt.Sprintf("%s_%s_%d_%s", config.GetString("redis_key.dice_round_locks_key"), gameID, roundID, userID)
 }
 
 func GetScoreKey(gameID string, userID string) string {
-	return fmt.Sprintf("%s_%s_%s_%s_%s", config.GetString("redis_key.dice_score_key"), gameID, userID)
+	return fmt.Sprintf("%s_%s_%s", config.GetString("redis_key.dice_score_key"), gameID, userID)
 }
-
+func GetScoreValueKey(gameID string, userID string) string {
+	return fmt.Sprintf("%s_%s_%s", config.GetString("redis_key.dice_score_value_key"), gameID, userID)
+}
 func GetGameCreatedKey(gameID string) string {
 	return fmt.Sprintf("%s_%s", config.GetString("redis_key.game_created_key"), gameID)
-}
-
-func SetGameCreatedData(gameID string, val *types.GameInfo) error {
-	rc, _ := mod.GetRedisClient()
-	key := GetGameCreatedKey(gameID)
-
-	setv, err := json.Marshal(val)
-	if err != nil {
-		return err
-	}
-	_, err = rc.Set(context.Background(), key, setv, 0).Result()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // 获取房间redis key
@@ -60,50 +45,6 @@ func GetRoomListKey() string {
 }
 func GetGameListKey() string {
 	return fmt.Sprintf("%s", config.GetString("redis_key.game_list_key"))
-}
-
-// 获取骰子的最新的值
-func GetDiceValue(key string) *types.DiceValue {
-	rc, _ := mod.GetRedisClient()
-
-	key = fmt.Sprintf("%s%d", config.GetString("redis_key.dice_key"), key)
-
-	diceValue := &types.DiceValue{Value: make([]int, 5)}
-
-	// 获取redis的值,如果没有,代表是新的一轮
-	if val, err := rc.Get(context.Background(), key).Result(); err == nil {
-		err = json.Unmarshal([]byte(val), &diceValue.Value)
-	}
-
-	return diceValue
-}
-func GetDiceScore(key string, value interface{}) *types.DiceScore {
-	rc, _ := mod.GetRedisClient()
-
-	key = fmt.Sprintf("%s%d", config.GetString("redis_key.dice_score_key"), 1)
-
-	diceScore := &types.DiceScore{}
-
-	// 获取redis的值,如果没有,代表是新的一轮
-	if val, err := rc.Get(context.Background(), key).Result(); err == nil {
-		err = json.Unmarshal([]byte(val), diceScore)
-	}
-
-	return diceScore
-}
-func GetDiceScoreType(key string, value interface{}) *types.DiceScore {
-	rc, _ := mod.GetRedisClient()
-
-	key = fmt.Sprintf("%s%d", config.GetString("redis_key.dice_score_type_key"), 1)
-
-	diceScore := &types.DiceScore{}
-
-	// 获取redis的值,如果没有,代表是新的一轮
-	if val, err := rc.Get(context.Background(), key).Result(); err == nil {
-		err = json.Unmarshal([]byte(val), diceScore)
-	}
-
-	return diceScore
 }
 
 // 检测四骰同花
@@ -213,8 +154,4 @@ func CheckKT(arr []int) int {
 	}
 
 	return 0
-}
-
-func CheckIsNextRound() {
-
 }
