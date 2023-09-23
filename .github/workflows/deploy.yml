@@ -12,7 +12,7 @@ jobs:
       matrix:
         node-version: [ 16.13.x ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v2
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
@@ -43,7 +44,7 @@ jobs:
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > deploy_key
           chmod 600 deploy_key
-          scp -i deploy_key ${{ github.workspace }}/docker-compose.yml root@${{ secrets.SERVER_IP }}:/project/kttz/
+          scp -i deploy_key docker-compose.yml root@${{ secrets.SERVER_IP }}:/project/kttz/
           ssh -i deploy_key root@${{ secrets.SERVER_IP }} "cd /project/kttz && docker-compose pull && docker-compose up -d"
         env:
           DEPLOY_KEY: ${{ secrets.SERVER_SSH_KEY }}
