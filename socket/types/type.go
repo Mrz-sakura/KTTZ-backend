@@ -52,6 +52,7 @@ type Dice struct {
 	Value        []int  `json:"value"`         // 骰子的值
 	LockedIndexs []int  `json:"locked_indexs"` // 本轮锁定的索引
 	Frequency    int    `json:"frequency"`     // 剩余次数
+	IsRoundFirst bool   `json:"is_round_first"`
 }
 
 type RoomInfo struct {
@@ -64,24 +65,25 @@ type RoomInfo struct {
 }
 
 var (
-	START_THROWS      = "start_throws"
-	SET_SCORE         = "set_score"
-	GAME_CREATED      = "game_created"
-	JOIN_ROOM         = "join_room"
-	ROOMLIST          = "room_list"
-	ROOMINFO          = "room_info"
-	ROOM_CREATED      = "room_created"
-	ROOM_UPDATE       = "room_update" // 游戏信息更新
-	GETGAME           = "get_game"    // 获取游戏详情
-	LEAVE_ROOM        = "leave_room"
-	DELETE_ROOM       = "delete_room"
-	GAME_ROUND_START  = "game_round_start"
-	PLAYER_TURN_START = "player_turn_start" // 下一个玩家的回合开始
-	GAME_END          = "game_end"
-	GAME_UPDATE       = "game_update"  // 游戏信息更新
-	SCORE_UPDATE      = "score_update" // 游戏信息更新
-	UPDATE_DICELOCKS  = "update_dice_locks"
-	UPDATE_TMPLOCKS   = "update_tmp_locks"
+	START_THROWS          = "start_throws"
+	SET_SCORE             = "set_score"
+	GAME_CREATED          = "game_created"
+	JOIN_ROOM             = "join_room"
+	ROOMLIST              = "room_list"
+	ROOMINFO              = "room_info"
+	ROOM_CREATED          = "room_created"
+	ROOM_UPDATE           = "room_update" // 游戏信息更新
+	GETGAME               = "get_game"    // 获取游戏详情
+	LEAVE_ROOM            = "leave_room"
+	DELETE_ROOM           = "delete_room"
+	GAME_ROUND_START      = "game_round_start"
+	PLAYER_TURN_START     = "player_turn_start" // 下一个玩家的回合开始
+	GAME_END              = "game_end"
+	GAME_UPDATE           = "game_update"  // 游戏信息更新
+	SCORE_UPDATE          = "score_update" // 游戏信息更新
+	UPDATE_DICELOCKS      = "update_dice_locks"
+	UPDATE_TMPLOCKS       = "update_tmp_locks"
+	GAME_WINNER_ANNOUNCED = "game_winner"
 )
 
 var MsgTypeMap = map[string]string{

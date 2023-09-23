@@ -6,7 +6,6 @@ import (
 	"app-bff/socket/types"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"strconv"
 )
@@ -20,8 +19,6 @@ func (server *WebSocketServer) HandlerStartThrows(c *Client, message *types.Mess
 	}
 
 	dice, err := server.CreateDiceValue(c, message)
-
-	_, err = server.UpdateGame(c, c.Game)
 
 	message = &types.Message{
 		Type: message.Type,
@@ -46,22 +43,21 @@ func (server *WebSocketServer) HandleUpdateTmpDiceLocks(c *Client, message *type
 func (server *WebSocketServer) CreateDiceValue(c *Client, message *types.Message) (*types.Dice, error) {
 	lockedIndexs := utils.MapToSliceInt(message.Data, "locked_indexs")
 
-	fmt.Println(lockedIndexs, "lockedI=======ndexslockedIndexslockedIndexslockedIndexs")
-	key := common.GetDiceKey(c.Game.ID, c.Game.Round, c.ID)
+	key := common.GetDiceRoundsKey(c.Game.ID, c.ID)
 	diceValue, err := server.GetDiceValue(key, c)
 
+	// 如果有错误,代表没找到,那么是第一次
 	if err != nil {
-		diceValue = &types.Dice{
-			GameID:       c.Game.ID,
-			Round:        c.Game.Round,
-			Value:        make([]int, 5),
-			LockedIndexs: lockedIndexs,
-			Frequency:    3,
-		}
+		diceValue = server.InitDice(c, c.Game)
+		diceValue.LockedIndexs = lockedIndexs
 	}
-
-	diceValue.Frequency--
-	c.Game.RoundsInfo.CurrentPlayerActions++
+	// 如果是第一次就不減少次數
+	if diceValue.IsRoundFirst == true {
+		diceValue.IsRoundFirst = false
+	} else {
+		diceValue.Frequency--
+		c.Game.RoundsInfo.CurrentPlayerActions++
+	}
 
 	// 去掉第0个的选项
 	for i := 1; i < 6; i++ {
@@ -161,6 +157,18 @@ func (server *WebSocketServer) UpdateDiceLocks(c *Client, game *Game) error {
 	}
 
 	return server.Redis.HSet(context.Background(), key, game.Round, diceData).Err()
+}
+
+func (server *WebSocketServer) InitDice(player *Client, game *Game) (dice *types.Dice) {
+	return &types.Dice{
+		GameID:       game.ID,
+		ClientID:     player.ID,
+		Round:        game.Round,
+		Value:        make([]int, 5),
+		LockedIndexs: make([]int, 5),
+		Frequency:    3,
+		IsRoundFirst: true,
+	}
 }
 
 //func (server *WebSocketServer) GetDiceValue(key string, c *Client) (*types.Dice, error) {

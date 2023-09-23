@@ -41,3 +41,10 @@ type DiceScoreValue struct {
 	KT     bool `json:"kt"`   // 快艇
 	Sum    bool `json:"sum"`  // 总和
 }
+
+func (score *DiceScore) Total() int {
+	var sum int
+	sum = score.One + score.Two + score.Three + score.Four + score.Five + score.Six + score.All + score.STTH + score.Reward + score.HL + score.DS + score.XS + score.KT
+
+	return sum
+}

@@ -308,7 +308,7 @@ func (server *WebSocketServer) CheckScoreReward(score *types.DiceScore) {
 func (server *WebSocketServer) GetScoreSum(score *types.DiceScore) int {
 	var sum int
 
-	sum = (score.One + score.Two + score.Three + score.Four + score.Five + score.Six + score.STTH + score.Reward + score.HL + score.DS + score.XS + score.KT)
+	sum = (score.One + score.Two + score.Three + score.Four + score.Five + score.Six + score.All + score.STTH + score.Reward + score.HL + score.DS + score.XS + score.KT)
 
 	score.Sum = sum
 

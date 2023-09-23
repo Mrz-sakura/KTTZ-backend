@@ -23,17 +23,21 @@ func MapToSliceString(args map[string]interface{}, key string) []string {
 	return indexStrings
 }
 func MapToSliceInt(args map[string]interface{}, key string) []int {
+	fmt.Println(args[key])
 	interfaces, ok := args[key].([]interface{})
 	if !ok {
-		fmt.Println("args KEY ERROR :", key)
+		fmt.Println("Error:", key)
 		return make([]int, 0)
 	}
 	indexInt := make([]int, len(interfaces))
 
 	for i, val := range interfaces {
-		indexInt[i], ok = val.(int)
-		if !ok {
-			fmt.Println("args i ERROR :", i)
+		if intValue, ok := val.(int); ok {
+			indexInt[i] = intValue
+		} else if floatValue, ok := val.(float64); ok { // If not int, try float64
+			indexInt[i] = int(floatValue)
+		} else {
+			fmt.Println("转化失败:", i)
 			return make([]int, 0)
 		}
 	}

@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"app-bff/pkg/config"
 	"app-bff/pkg/errorss"
 	"app-bff/pkg/utils"
 	"app-bff/socket/common"
@@ -135,8 +136,8 @@ func (server *WebSocketServer) CreateGame(gameID string, client *Client) (*Game,
 	game := &Game{
 		ID:            gameID,
 		RoomID:        client.Room.ID,
-		Round:         0,  // 初始化回合数为 0
-		MaxRounds:     12, // 设置最大回合数为 12
+		Round:         0,                               // 初始化回合数为 0
+		MaxRounds:     config.GetInt("game.max_round"), // 设置最大回合数
 		Players:       make(map[*Client]bool),
 		PlayerActions: make(map[*Client]bool),
 		CreatedTime:   time.Now(),
@@ -307,27 +308,7 @@ func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
 
 	// 检查当前回合数是否超过最大回合数
 	if game.Round > game.MaxRounds {
-		game.EndTime = time.Now() // 设置游戏结束时间
-		game.IsEnd = true
-
-		_, err := server.UpdateGame(c, game)
-
-		message := &types.Message{
-			Type: types.GAME_END,
-			Data: map[string]interface{}{
-				"game_id":   game.ID,
-				"round":     game.Round,     // 包含当前回合信息
-				"max_round": game.MaxRounds, // 包含当前回合信息
-				"game_info": server.GameClientToInfo(game),
-				"message":   fmt.Sprintf("游戏结束啦,我们下局再战~"),
-			},
-		}
-
-		if err != nil {
-			message.Error = err.Error()
-		}
-
-		server.BroadGameMessage(game, message)
+		server.GameOver(c, game)
 		return
 	}
 
@@ -373,6 +354,33 @@ func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
 
 	// 检测玩家是否设置了分数
 	//go server.CheckPlayerRoundsCompletedAndHasScore(c, game)
+}
+
+func (server *WebSocketServer) GameOver(c *Client, game *Game) {
+	game.EndTime = time.Now() // 设置游戏结束时间
+	game.IsEnd = true
+	game.RoundsInfo = server.InitRoundsInfo()
+
+	_, err := server.UpdateGame(c, game)
+
+	message := &types.Message{
+		Type: types.GAME_END,
+		Data: map[string]interface{}{
+			"game_id":   game.ID,
+			"round":     game.Round,     // 包含当前回合信息
+			"max_round": game.MaxRounds, // 包含当前回合信息
+			"game_info": server.GameClientToInfo(game),
+			"message":   fmt.Sprintf("游戏结束啦,我们下局再战~"),
+		},
+	}
+
+	if err != nil {
+		message.Error = err.Error()
+	}
+
+	server.CheckWinner(c, game)
+
+	server.BroadGameMessage(game, message)
 }
 
 func (server *WebSocketServer) GameClientToInfo(game *Game) *types.GameInfo {
@@ -508,6 +516,34 @@ func (server *WebSocketServer) CheckPlayerCanPlay(c *Client, message *types.Mess
 	return true
 }
 
+// 檢測勝利者
+func (server *WebSocketServer) CheckWinner(c *Client, game *Game) {
+	var winner *Client
+	var highestScore int
+
+	// 遍历所有玩家的得分
+	for player, scoreValue := range game.Scores {
+		totalScore := scoreValue.Total() // 假设你有一个Total方法来计算玩家的总得分
+		if totalScore > highestScore {
+			highestScore = totalScore
+			winner = player
+		}
+	}
+
+	// 广播胜利者信息
+	message := &types.Message{
+		Type: types.GAME_WINNER_ANNOUNCED,
+		Data: map[string]interface{}{
+			"game_id":   game.ID,
+			"winner_id": winner.ID,
+			"score":     highestScore,
+			"message":   fmt.Sprintf("恭喜玩家 %s 获胜，总得分为 %d! 恕我直言,其他人都是辣雞!!!", winner.ID, highestScore),
+		},
+	}
+
+	server.BroadGameMessage(game, message)
+}
+
 // 广播给游戏的所有人告知游戏状态更新
 func (server *WebSocketServer) SendGameInfo(game *Game) {
 	message := &types.Message{
@@ -530,16 +566,5 @@ func (server *WebSocketServer) InitRoundsInfo() *Rounds {
 		CompletedChan:           make(chan *Client),
 		CurrentPlayerScore:      &types.DiceScore{},
 		CurrentPlayerScoreValue: &types.DiceScoreValue{},
-	}
-}
-
-func (server *WebSocketServer) InitDice(player *Client, game *Game) (dice *types.Dice) {
-	return &types.Dice{
-		GameID:       game.ID,
-		ClientID:     player.ID,
-		Round:        game.Round,
-		Value:        make([]int, 5),
-		LockedIndexs: make([]int, 5),
-		Frequency:    3,
 	}
 }
