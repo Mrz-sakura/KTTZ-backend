@@ -1,11 +1,11 @@
 version: '3'
 services:
   backend:
-    image: my-golang-app
+    image: my-golang-project
     ports:
       - "8080:8080"
-  frontend:
-    image: my-react-app
-    ports:
-      - "80:80"
+#  frontend:
+#    image: my-react-app
+#    ports:
+#      - "80:80"
 
