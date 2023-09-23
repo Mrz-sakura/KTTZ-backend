@@ -34,7 +34,7 @@ jobs:
 
 
   deploy:
-    needs: build-and-push
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
