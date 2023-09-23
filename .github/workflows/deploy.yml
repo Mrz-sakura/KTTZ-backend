@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+      runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -20,6 +20,7 @@ jobs:
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/my-golang-app:latest .
           docker push ${{ secrets.DOCKER_USERNAME }}/my-golang-app:latest
+
 
   deploy:
     needs: build-and-push
