@@ -18,8 +18,8 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-golang-app:latest .
-          docker push ${{ secrets.DOCKER_USERNAME }}/my-golang-app:latest
+          docker build -t my-golang-app:latest .
+          docker push my-golang-app:latest
 
 
   deploy:
