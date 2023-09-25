@@ -17,8 +17,6 @@ func InitializeConfig() error {
 	// 根据环境变量来确定加载哪个配置文件
 	env := viper.GetString("ENV")
 	if env == "" {
-		env = "local"
-	} else {
 		env = "prod"
 	}
 	viper.SetConfigName("config." + env)
