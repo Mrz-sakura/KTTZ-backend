@@ -28,24 +28,3 @@ jobs:
         run: docker build -t ${{ secrets.DOCKER_USERNAME }}/my-golang-project:latest .
       - name: Docker image push
         run: docker push ${{ secrets.DOCKER_USERNAME }}/my-golang-project:latest
-
-
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Add server to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
-      - name: Deploy to server
-        run: |
-          echo "${{ secrets.SERVER_SSH_KEY }}" > deploy_key
-          chmod 600 deploy_key
-          scp -i deploy_key docker-compose.yml root@${{ secrets.SERVER_IP }}:/project/kttz/
-          ssh -i deploy_key root@${{ secrets.SERVER_IP }} "docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} && cd /project/kttz && docker-compose pull && docker-compose up -d"
-        env:
-          DEPLOY_KEY: ${{ secrets.SERVER_SSH_KEY }}
