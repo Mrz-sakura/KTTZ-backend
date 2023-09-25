@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -45,7 +46,10 @@ type Room struct {
 
 // NewWebSocketServer 创建一个新的WebSocketServer实例
 func NewWebSocketServer() *WebSocketServer {
-	redis, _ := mod.GetRedisClient()
+	rds, err := mod.GetRedisClient()
+	if err != nil {
+		log.Fatal(err)
+	}
 	server := &WebSocketServer{
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -55,7 +59,7 @@ func NewWebSocketServer() *WebSocketServer {
 		routes: make(map[string]func(*Client, *types.Message)),
 		Rooms:  make(map[string]*Room),
 		Games:  make(map[string]*Game),
-		Redis:  redis,
+		Redis:  rds,
 	}
 
 	server.InitRoutes()
