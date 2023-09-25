@@ -303,7 +303,9 @@ func (server *WebSocketServer) GetRoomList() ([]*types.RoomInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		rooms = append(rooms, room)
+		if room.IsGameStart == false {
+			rooms = append(rooms, room)
+		}
 	}
 
 	return rooms, nil

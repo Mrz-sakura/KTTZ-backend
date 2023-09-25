@@ -49,7 +49,6 @@ func (server *WebSocketServer) CreateDiceValue(c *Client, message *types.Message
 	// 如果有错误,代表没找到,那么是第一次
 	if err != nil {
 		diceValue = server.InitDice(c, c.Game)
-		diceValue.LockedIndexs = lockedIndexs
 	}
 	// 如果是第一次就不減少次數
 	if diceValue.IsRoundFirst == true {
@@ -58,6 +57,8 @@ func (server *WebSocketServer) CreateDiceValue(c *Client, message *types.Message
 		diceValue.Frequency--
 		c.Game.RoundsInfo.CurrentPlayerActions++
 	}
+
+	diceValue.LockedIndexs = lockedIndexs
 
 	// 去掉第0个的选项
 	for i := 1; i < 6; i++ {

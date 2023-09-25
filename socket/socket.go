@@ -216,8 +216,11 @@ func (server *WebSocketServer) JoinRoom(client *Client, roomID string) {
 	room, err := server.GetRoomByIDIFExist(roomID)
 
 	if room == nil {
-		room, err = server.CreateRoom(roomID, client)
-		server.Rooms[roomID] = room
+		//room, err = server.CreateRoom(roomID, client)
+		//server.Rooms[roomID] = room
+		response.Error = "房间不存在..."
+		server.SendMessageToClient(client, response)
+		return
 	}
 
 	room.Players[client] = true

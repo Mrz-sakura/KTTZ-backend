@@ -165,7 +165,7 @@ func (server *WebSocketServer) CreateGame(gameID string, client *Client) (*Game,
 }
 
 func (server *WebSocketServer) InsertGame(gameID string, gameInfo *types.GameInfo) error {
-	gamesKey := common.GetRoomListKey()
+	gamesKey := common.GetGameListKey()
 
 	gameData, err := json.Marshal(gameInfo)
 	if err != nil {
