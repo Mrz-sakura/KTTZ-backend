@@ -9,7 +9,6 @@ redis:
 
 
 
-
 redis_key:
   dice_key: "dice_state_"
   dice_round_key: "dice_round_"
@@ -22,3 +21,6 @@ redis_key:
   room_list_key: "room_list_"
   game_list_key: "game_list_"
 
+
+game:
+  max_round: 12

@@ -22,3 +22,7 @@ redis_key:
   room_list_key: "room_list_"
   game_list_key: "game_list_"
 
+
+game:
+  max_round: 12
+

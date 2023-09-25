@@ -81,31 +81,6 @@ func (server *WebSocketServer) HandleCreateGame(client *Client, message *types.M
 	server.StartGameRound(client, game)
 }
 
-//func (server *WebSocketServer) HandleGetGameOne(client *Client, message *types.Message) {
-//	var err error
-//
-//	id := utils.MapToString(message.Data, "game_id")
-//	roomList, err := server.GetGameByID(id)
-//
-//	// 创建一个消息来通知客户端游戏已创建
-//	response := types.Message{
-//		Type: types.ROOMLIST,
-//		Data: map[string]interface{}{
-//			"room_list": roomList,
-//		},
-//		From: &types.ClientInfo{
-//			ID: client.ID,
-//		},
-//	}
-//
-//	if err != nil {
-//		response.Error = err.Error()
-//	}
-//
-//	// 广播消息到所有在房间中的客户端
-//	server.SendMessageToClient(client, &response)
-//}
-
 func (server *WebSocketServer) GetGameClients(roomID string) ([]string, error) {
 	if roomID == "" {
 		return nil, fmt.Errorf("room name cannot be empty")
@@ -312,13 +287,7 @@ func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
 		return
 	}
 
-	game.Dice = &types.Dice{
-		GameID:       game.ID,
-		Round:        game.Round,
-		Value:        make([]int, 5),
-		LockedIndexs: make([]int, 5),
-		Frequency:    3,
-	}
+	game.Dice = server.InitDice(c, game)
 
 	// 创建一个消息来通知客户端新的回合开始
 	message := &types.Message{
