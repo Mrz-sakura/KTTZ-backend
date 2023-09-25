@@ -51,7 +51,6 @@ func (server *WebSocketServer) HandleCreateGame(client *Client, message *types.M
 
 	// 从房间中获取所有客户端并将他们添加到游戏中
 	server.Games[gameID] = game
-	client.Game = game
 
 	// 创建一个消息来通知客户端游戏已创建
 	response := types.Message{
@@ -125,6 +124,9 @@ func (server *WebSocketServer) CreateGame(gameID string, client *Client) (*Game,
 	room, err := server.GetRoomByIDIFExist(client.Room.ID)
 	if room != nil {
 		for player := range room.Players {
+			player.Game = game
+			player.GameID = game.ID
+
 			game.Players[player] = true
 			game.PlayerActions[player] = false // 初始化玩家行动状态为false
 			game.ScoresValue[player] = &types.DiceScoreValue{}
@@ -407,6 +409,9 @@ func (server *WebSocketServer) NoticeNextPlayersRound(c *Client, game *Game) {
 				"player_id": game.RoundsInfo.CurrentPlayer.ID,
 				"message":   fmt.Sprintf("亲爱的玩家 %s,你的回合开始！", game.RoundsInfo.CurrentPlayer.ID),
 			},
+			From: &types.ClientInfo{
+				ID: game.RoundsInfo.CurrentPlayer.ID,
+			},
 		}
 		if err != nil {
 			message.Error = err.Error()
@@ -414,7 +419,7 @@ func (server *WebSocketServer) NoticeNextPlayersRound(c *Client, game *Game) {
 			return
 		}
 
-		server.SendMessageToClient(game.RoundsInfo.CurrentPlayer, message)
+		server.BroadGameMessage(game, message)
 		// 由于我们已经找到了下一个玩家，可以跳出循环
 		break
 	}
