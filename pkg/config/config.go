@@ -18,6 +18,8 @@ func InitializeConfig() error {
 	env := viper.GetString("ENV")
 	if env == "" {
 		env = "local"
+	} else {
+		env = "prod"
 	}
 	viper.SetConfigName("config." + env)
 
