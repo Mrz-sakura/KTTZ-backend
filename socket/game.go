@@ -279,15 +279,15 @@ func (server *WebSocketServer) GetGameByID() (*types.GameInfo, error) {
 }
 
 func (server *WebSocketServer) StartGameRound(c *Client, game *Game) {
-	// 递增回合数以准备下一轮
-	game.Round++
-	game.RoundsInfo = server.InitRoundsInfo()
-
 	// 检查当前回合数是否超过最大回合数
-	if game.Round > game.MaxRounds {
+	if game.Round >= game.MaxRounds {
 		server.GameOver(c, game)
 		return
 	}
+
+	// 递增回合数以准备下一轮
+	game.Round++
+	game.RoundsInfo = server.InitRoundsInfo()
 
 	game.Dice = server.InitDice(c, game)
 
@@ -332,8 +332,6 @@ func (server *WebSocketServer) GameOver(c *Client, game *Game) {
 	game.IsEnd = true
 	game.RoundsInfo = server.InitRoundsInfo()
 
-	_, err := server.UpdateGame(c, game)
-
 	message := &types.Message{
 		Type: types.GAME_END,
 		Data: map[string]interface{}{
@@ -345,13 +343,59 @@ func (server *WebSocketServer) GameOver(c *Client, game *Game) {
 		},
 	}
 
+	_, err := server.UpdateGame(c, game)
+	if err != nil {
+		message.Error = err.Error()
+		server.SendMessageToClient(c, message)
+		return
+	}
+
+	time.Sleep(time.Second * 2)
+
+	server.CheckWinner(c, game)
+
+	if err != nil {
+		message.Error = err.Error()
+		server.SendMessageToClient(c, message)
+		return
+	}
+
+	// 删除掉游戏
+	server.DeleteGame(c, game)
+
 	if err != nil {
 		message.Error = err.Error()
 	}
 
-	server.CheckWinner(c, game)
-
 	server.BroadGameMessage(game, message)
+}
+func (server *WebSocketServer) DeleteGame(c *Client, game *Game) {
+	delete(server.Games, game.ID)
+
+	_ = server.DeleteGameData(c, c.Game)
+
+	c.Game = nil
+	c.GameID = ""
+
+	for v := range c.Room.Players {
+		v.Game = nil
+		v.GameID = ""
+	}
+
+	// 设置房间的状态为未开始
+	c.Room.IsGameStart = false
+	_, _ = server.UpdateRoom(c, c.Room)
+}
+
+func (server *WebSocketServer) DeleteGameData(c *Client, game *Game) error {
+	gamesKey := common.GetGameListKey()
+
+	err := server.Redis.HDel(context.Background(), gamesKey, game.ID).Err()
+	if err != nil {
+		return errorss.NewWithCode(errorss.SOCKET_REDIS_ERROR)
+	}
+
+	return nil
 }
 
 func (server *WebSocketServer) GameClientToInfo(game *Game) *types.GameInfo {

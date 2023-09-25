@@ -183,10 +183,7 @@ func (server *WebSocketServer) SaveDiceScore(c *Client, key string, svKey string
 			break
 		}
 		score := common.ChcekHL(DiceValue.Value)
-		//if score == 0 {
-		//	message.Error = "不是葫芦"
-		//	break
-		//}
+
 		DiceScoreValue.HL = true
 		DiceScore.HL = score
 	case types.DS:
@@ -279,6 +276,32 @@ func (server *WebSocketServer) SaveDiceScore(c *Client, key string, svKey string
 	return message
 }
 func (server *WebSocketServer) saveDiceScoreValue(DiceScoreValue *types.DiceScoreValue, key string) error {
+	setv, err := json.Marshal(DiceScoreValue)
+	if err != nil {
+		return err
+	}
+
+	_, err = server.Redis.Set(context.Background(), key, setv, 0).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (server *WebSocketServer) SaveGameOverDiceScoreValue(DiceScoreValue *types.DiceScoreValue, key string) error {
+	setv, err := json.Marshal(DiceScoreValue)
+	if err != nil {
+		return err
+	}
+
+	_, err = server.Redis.Set(context.Background(), key, setv, 0).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (server *WebSocketServer) DeleteGameOverDiceScoreValue(DiceScoreValue *types.DiceScoreValue, key string) error {
 	setv, err := json.Marshal(DiceScoreValue)
 	if err != nil {
 		return err
