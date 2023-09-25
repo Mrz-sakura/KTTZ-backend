@@ -2,7 +2,7 @@ FROM golang:1.20
 
 WORKDIR /app
 
-ENV ENV=prod
+ENV MYAPP=prod
 
 COPY go.mod go.sum ./
 

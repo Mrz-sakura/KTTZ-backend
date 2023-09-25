@@ -19,7 +19,7 @@ func InitializeConfig() error {
 	if env == "" {
 		env = "prod"
 	}
-	viper.SetConfigName("config." + env)
+	viper.SetConfigName("config." + env + ".yaml")
 
 	// 读取配置文件
 	if err := viper.ReadInConfig(); err != nil {
