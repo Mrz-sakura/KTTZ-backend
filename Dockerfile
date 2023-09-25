@@ -10,7 +10,8 @@ RUN go mod download
 
 COPY . .
 
-COPY config/ /app/config/
+COPY config/config.prod.yaml /app/config/
+
 
 RUN go build -o main .
 
